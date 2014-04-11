@@ -1,0 +1,5 @@
+q.py - a tool for querying the SLAC-hosted data catalog for LSST
+sensor test data based on sensorID, testType, and any other metadata
+(i.e., data contained in the primary FITS header).  More info here:
+
+https://confluence.slac.stanford.edu/display/~dragon/LSST+Sensor+Data+Query+Tool
