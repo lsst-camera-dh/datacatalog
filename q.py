@@ -16,6 +16,10 @@ import argparse
 parser = argparse.ArgumentParser(description='query the SRS dataCatalog')
 
 ## Parameters (optional unless "required")
+parser.add_argument('-r','--remoteUser',default=None,help="remote (SLAC) username to use")
+parser.add_argument('-R','--remotePath',default=None,help="remote path root, e.g., /astro/astronfs01/ccdtest")
+
+
 ## FT1 metadata filter opts
 parser.add_argument('-f','--filter',default=None,help="FT1 metadata filter string (default=%(default)s)")
 ##   The following are 'convenience options' which could also be specified in the filter string
@@ -25,7 +29,7 @@ parser.add_argument('-T','--TestType', default=None,help="(metadata) test type")
 
 ## Limit dataCatalog search to specified parts of the catalog
 parser.add_argument('-g','--group',default=None,help="Limit search to specified dataCat group (default=%(default)s)")
-parser.add_argument('-l','--logicalDir',default='SensorTestData/eotestData',help="dataCat logical directory to search (default=%(default)s)")
+parser.add_argument('-m','--mirrorName',default='BNL3',help="mirror name to search, i.e. in dataCat /LSST/mirror/<mirrorName> (default=%(default)s)")
 parser.add_argument('-X','--XtraOpts',default='',help="any extra 'datacat find' options")
 
 ## Output
@@ -55,8 +59,13 @@ if debug:                    ## Diagnostic dump of command line args
 ####################################################################################
 
 ##  Map of FT1 header metadata names with script args (see LCA-10140)
+# FT1map = [
+#     ('LSST_NUM',args.sensorID),
+#     ('DATE',args.timestamp),
+#     ('TESTTYPE',args.TestType)
+#     ]
 FT1map = [
-    ('LSST_NUM',args.sensorID),
+    ('CCD_SER',args.sensorID),
     ('DATE',args.timestamp),
     ('TESTTYPE',args.TestType)
     ]
@@ -64,7 +73,8 @@ FT1map = [
 ## Tools and Locations
 slacHost = 'rhel6-64.slac.stanford.edu'                                       ## ssh target
 dcCmd = '/u/lt/lsstsim/datacat/prod/datacat find --recurse --search-groups --search-folders '  ## base datacat command
-logicalDir = '/LSST/'+args.logicalDir                            ## default logical directory to search
+mirrorName = '/LSST/mirror/'+args.mirrorName                            ## default logical directory to search
+slacRoot = '/nfs/farm/g/lsst/u1/mirror/'+args.mirrorName      ## Location of mirror at SLAC
 
 ####################################################################################
 
@@ -87,15 +97,28 @@ if args.group != None:
     cmdOpts += ' --group '+args.group
     pass
 
-xtraBits = ' --display MONO_FILTER --display OD1_R '
+## xtraBits are 'hardwired' extra options to be added to each and
+## every 'datacat find' command
+#xtraBits = ' --display MONO_FILTER --display OD1_R '
 xtraBits = ''
 
-cmd = dcCmd+' '+cmdOpts+' '+xtraBits+' '+args.XtraOpts+' '+logicalDir
-print "Issuing the following command:"
+cmd = dcCmd+' '+cmdOpts+' '+xtraBits+' '+args.XtraOpts+' '+mirrorName
+
+if args.remoteUser != None:
+    cmd = 'ssh '+args.remoteUser+'@rhel6-64.slac.stanford.edu '+cmd
+    pass
+
+
+print "\nIssuing the following command:"
 print "$ ",cmd
 
 ## Spawn subprocess and run command
-cmdList = shlex.split(cmd)
+if args.remoteUser == None:
+    cmdList = shlex.split(cmd)     ## Domestic command
+else:
+    cmdList = cmd.split()          ## Foreign command via ssh
+    pass
+
 if not dryrun:
     so = Popen(cmdList, stdout=PIPE, stderr=PIPE)
 ##     fetch output
@@ -128,6 +151,13 @@ fileList = []
 if len(normalOut) > 0:
     fileList = normalOut.splitlines()
     fileList.sort()
+    ## Replace SLAC path with remote path, if requested
+    if args.remotePath != None:
+        for indx in range(len(fileList)):
+            fileList[indx]=args.remotePath+'/'+fileList[indx].lstrip(slacRoot)
+            pass
+        pass
+        
     if args.displayAll:
         lim = len(fileList)
     else:
