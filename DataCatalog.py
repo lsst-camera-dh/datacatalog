@@ -89,12 +89,13 @@ if __name__ == '__main__':
     #      LocalForward 8180 scalnx-v04.slac.stanford.edu:8180
     #
     # in .ssh/config.
-    config_url = "http://localhost:8180/org-srs-webapps-datacat-0.2-SNAPSHOT/r"
+    #config_url = "http://localhost:8180/org-srs-webapps-datacat-0.2-SNAPSHOT/r"
 
     folder = '/LSST/mirror/BNL3'
     query = 'TEMP_SET==-125 && TESTTYPE="DARK"'
 
-    datacatalog = DataCatalog(folder=folder, config_url=config_url,
+    datacatalog = DataCatalog(folder=folder,
+                              #config_url=config_url,
                               experiment='LSST')
 
     datasets = datacatalog.find_datasets(query)
