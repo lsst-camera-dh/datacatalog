@@ -6,15 +6,26 @@ import os
 import subprocess
 import datacat
 
-remote_hosts = {'SLAC' : 'centaurusa.slac.stanford.edu'}
+remote_hosts = {'SLAC' : 'rhel6-64.slac.stanford.edu'}
 
 class DatasetList(list):
     def __init__(self, my_list, datacat_obj):
         super(DatasetList, self).__init__(my_list)
         self.folder = datacat_obj.folder
         self.login = datacat_obj.remote_login
+        self.site = datacat_obj.site
+    @property
     def filenames(self):
         return [str(x.name) for x in self]
+    @property
+    def full_paths(self):
+        my_full_paths = []
+        for dataset in self:
+            for location in dataset.locations:
+                if location.site == self.site:
+                    break
+            my_full_paths.append(str(location.resource))
+        return my_full_paths
     def download(self, site='SLAC', rootpath='.', nfiles=None, dryrun=True,
                  clobber=False):
         user_host = '@'.join((self.login, remote_hosts[site]))
@@ -23,7 +34,7 @@ class DatasetList(list):
         if dryrun:
             print "Dry run. The following commands would be executed:\n"
         my_datasets = []
-        for dataset in datasets[:nfiles]:
+        for dataset in self[:nfiles]:
             for location in dataset.locations:
                 if location.site == site:
                     my_datasets.append(dataset)
@@ -53,10 +64,12 @@ class DataCatalogException(RuntimeError):
 
 class DataCatalog(object):
     def __init__(self, folder=None, experiment="LSST", 
-                 mode="dev", remote_login=None, config_url=None):
+                 mode="dev", remote_login=None, site='SLAC',
+                 config_url="http://srs.slac.stanford.edu/datacat-v0.2/r"):
         self.folder = folder
         if remote_login is None:
             self.remote_login = os.getlogin()
+        self.site = site
         # CONFIG_URL checks validity of experiment and mode values.
         my_config_url = datacat.config.CONFIG_URL(experiment, mode=mode)
         if my_config_url is None:
@@ -70,33 +83,19 @@ class DataCatalog(object):
         if folder is not None:
             self.folder = folder
         pattern_path = os.path.join(self.folder, pattern)
-        what = "Failed datacat query:\n pattern = '%s'\n query = '%s'" \
-               % (pattern, query)
-        try:
-            resp = self.client.search(pattern_path, query=query)
-        except datacat.client.DcException:
-            raise DataCatalogException(what)
+        resp = self.client.search(pattern_path, query=query)
         if resp.status_code != 200:
+            what = "Failed datacat query:\n pattern = '%s'\n query = '%s'" \
+                % (pattern, query)
             raise DataCatalogException(what + "\n Status Code: " 
                                        + resp.status_code)
         return DatasetList(datacat.unpack(resp.content), self)
 
 if __name__ == '__main__':
-    # URL to use if tunneling from outside SLAC firewall using
-    #
-    # Host tunnel 
-    #      ...
-    #      LocalForward 8180 scalnx-v04.slac.stanford.edu:8180
-    #
-    # in .ssh/config.
-    #config_url = "http://localhost:8180/org-srs-webapps-datacat-0.2-SNAPSHOT/r"
-
     folder = '/LSST/mirror/BNL3'
     query = 'TEMP_SET==-125 && TESTTYPE="DARK"'
 
-    datacatalog = DataCatalog(folder=folder,
-                              #config_url=config_url,
-                              experiment='LSST')
+    datacatalog = DataCatalog(folder=folder, experiment='LSST', site='SLAC')
 
     datasets = datacatalog.find_datasets(query)
     print "%i datasets found\n" % len(datasets)
