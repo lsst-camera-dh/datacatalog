@@ -9,8 +9,12 @@ import datacat
 remote_hosts = {'SLAC' : 'rhel6-64.slac.stanford.edu'}
 
 class DatasetList(list):
-    def __init__(self, my_list, datacat_obj):
-        super(DatasetList, self).__init__(my_list)
+    def __init__(self, my_list, datacat_obj, sort_by_name=True):
+        if sort_by_name:
+            super(DatasetList, self).__init__(sorted(my_list,
+                                                     key=lambda x : x.name))
+        else:
+            super(DatasetList, self).__init__(my_list)
         self.folder = datacat_obj.folder
         self.login = datacat_obj.remote_login
         self.site = datacat_obj.site
@@ -39,7 +43,7 @@ class DatasetList(list):
                 if location.site == site:
                     my_datasets.append(dataset)
         for dataset in my_datasets:
-            output = os.path.join(rootpath, 
+            output = os.path.join(rootpath,
                                   dataset.path[len(self.folder)+1:])
             outdir = os.path.split(output)[0]
             if not os.path.isdir(outdir):
@@ -63,7 +67,7 @@ class DataCatalogException(RuntimeError):
         super(DataCatalogException, self).__init__(value)
 
 class DataCatalog(object):
-    def __init__(self, folder=None, experiment="LSST", 
+    def __init__(self, folder=None, experiment="LSST",
                  mode="dev", remote_login=None, site='SLAC',
                  config_url="http://srs.slac.stanford.edu/datacat-v0.2/r"):
         self.folder = folder
@@ -87,17 +91,25 @@ class DataCatalog(object):
         if resp.status_code != 200:
             what = "Failed datacat query:\n pattern = '%s'\n query = '%s'" \
                 % (pattern, query)
-            raise DataCatalogException(what + "\n Status Code: " 
+            raise DataCatalogException(what + "\n Status Code: "
                                        + resp.status_code)
         return DatasetList(datacat.unpack(resp.content), self)
 
 if __name__ == '__main__':
     folder = '/LSST/mirror/BNL3'
     query = 'TEMP_SET==-125 && TESTTYPE="DARK"'
+    site = 'SLAC'
 
-    datacatalog = DataCatalog(folder=folder, experiment='LSST', site='SLAC')
+    datacatalog = DataCatalog(folder=folder, experiment='LSST', site=site)
 
     datasets = datacatalog.find_datasets(query)
     print "%i datasets found\n" % len(datasets)
 
-    datasets.download(dryrun=True, clobber=False, nfiles=5)
+    nfiles = 5
+    print "File paths for first %i files at %s:" % (nfiles, site)
+    for i in range(nfiles):
+        print datasets.full_paths[i]
+
+    print
+
+    datasets.download(dryrun=True, clobber=False, nfiles=nfiles)
