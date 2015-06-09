@@ -68,14 +68,12 @@ class DataCatalogException(RuntimeError):
 
 class DataCatalog(object):
     def __init__(self, folder=None, experiment="LSST",
-                 mode="dev", remote_login=None, site='SLAC',
-                 config_url="http://srs.slac.stanford.edu/datacat-v0.2/r"):
+                 mode="dev", remote_login=None, site='SLAC', config_url=None):
         self.folder = folder
         if remote_login is None:
             self.remote_login = os.getlogin()
         self.site = site
-        # CONFIG_URL checks validity of experiment and mode values.
-        my_config_url = datacat.config.CONFIG_URL(experiment, mode=mode)
+        my_config_url = datacat.config.default_url(experiment, mode=mode)
         if my_config_url is None:
             raise DataCatalogException("Invalid experiment or mode: %s, %s"
                                        % (experiment, mode))
@@ -88,12 +86,7 @@ class DataCatalog(object):
             self.folder = folder
         pattern_path = os.path.join(self.folder, pattern)
         resp = self.client.search(pattern_path, query=query)
-        if resp.status_code != 200:
-            what = "Failed datacat query:\n pattern = '%s'\n query = '%s'" \
-                % (pattern, query)
-            raise DataCatalogException(what + "\n Status Code: "
-                                       + resp.status_code)
-        return DatasetList(datacat.unpack(resp.content), self)
+        return DatasetList(resp, self)
 
 if __name__ == '__main__':
     folder = '/LSST/mirror/BNL3'
